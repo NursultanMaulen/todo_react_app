@@ -8,9 +8,10 @@ import {
   Group,
   Card,
   ActionIcon,
+  Select,
 } from "@mantine/core";
 import { useState, useRef, useEffect } from "react";
-import { MoonStars, Sun, Trash } from "tabler-icons-react";
+import { Checkbox, MoonStars, Sun, Trash } from "tabler-icons-react";
 
 import { MantineProvider, ColorSchemeProvider } from "@mantine/core";
 import { useHotkeys, useLocalStorage } from "@mantine/hooks";
@@ -18,6 +19,9 @@ import { useHotkeys, useLocalStorage } from "@mantine/hooks";
 export default function App() {
   const [tasks, setTasks] = useState([]);
   const [opened, setOpened] = useState(false);
+  const [states, setStates] = useState("");
+  const [stateChange, setStateChange] = useState(false);
+  const [editIndex, setEditIndex] = useState(0);
 
   const [colorScheme, setColorScheme] = useLocalStorage({
     key: "mantine-color-scheme",
@@ -31,12 +35,15 @@ export default function App() {
 
   const taskTitle = useRef("");
   const taskSummary = useRef("");
+  const taskState = useRef("");
 
   function createTask() {
     tasks.push({
       title: taskTitle.current.value,
       summary: taskSummary.current.value,
+      state: taskState.current.value,
     });
+    loadTasks();
     setTasks(tasks);
     saveTasks(tasks);
   }
@@ -48,6 +55,15 @@ export default function App() {
 
     setTasks(clonedTasks);
     saveTasks(clonedTasks);
+    loadTasks();
+  }
+
+  function sortTasks(state) {
+    const sortedTasks = [...tasks].sort((a, b) =>
+      a.state === state ? -1 : b.state === state ? 1 : 0
+    );
+    setTasks(sortedTasks);
+    saveTasks(sortedTasks);
   }
 
   function loadTasks() {
@@ -59,6 +75,35 @@ export default function App() {
       setTasks(tasks);
     }
   }
+
+  function updateState(index) {
+    var clonedTasks = tasks;
+
+    clonedTasks[index].state = taskState.current.value
+
+    setTasks(clonedTasks);
+    saveTasks(clonedTasks);
+    loadTasks();
+  }
+
+  function filterTasks(state) {
+    const filteredTasks = tasks.filter((task) => task.state === state);
+    setTasks(filteredTasks);
+  }
+
+  function editTask(index) {
+    const updatedTasks = [...tasks];
+    updatedTasks[index] = {
+      title: taskTitle.current.value,
+      summary: taskSummary.current.value,
+      state: taskState.current.value,
+    };
+    setTasks(updatedTasks);
+    saveTasks(updatedTasks);
+    setStateChange(false);
+  }
+  
+
 
   function saveTasks(tasks) {
     localStorage.setItem("tasks", JSON.stringify(tasks));
@@ -102,6 +147,15 @@ export default function App() {
               placeholder={"Task Summary"}
               label={"Summary"}
             />
+            <Select
+              data={["Done", "Not done", "Doing right now"]}
+              ref={taskState}
+              label="State"
+              placeholder="Select state"
+              required
+            />
+
+
             <Group mt={"md"} position={"apart"}>
               <Button
                 onClick={() => {
@@ -120,7 +174,65 @@ export default function App() {
               </Button>
             </Group>
           </Modal>
+          <Modal
+            opened={stateChange}
+            size={"md"}
+            title={"New State"}
+            withCloseButton={false}
+            onClose={() => {
+              setStateChange(false);
+            }}
+            centered
+          >
+            <TextInput
+              mt={"md"}
+              ref={taskTitle}
+              placeholder={"Task Title"}
+              required
+              label={"Title"}
+            />
+            <TextInput
+              ref={taskSummary}
+              mt={"md"}
+              placeholder={"Task Summary"}
+              label={"Summary"}
+            />
+            <Select
+              data={["Done", "Not done", "Doing right now"]}
+              ref={taskState}
+              label="State"
+              placeholder="Select state"
+              required
+            />
+            <Group mt={"md"} position={"apart"}>
+              <Button
+                onClick={() => {
+                  setStateChange(false);
+                }}
+                variant={"subtle"}
+              >
+                Cancel
+              </Button>
+              <Button
+                onClick={() => {
+                  editTask(editIndex);
+                }}
+              >
+                Edit Task
+              </Button>
+            </Group>
+          </Modal>
           <Container size={550} my={40}>
+          <Button onClick={() => sortTasks("Done")}>Show "Done" First</Button>
+          <Button onClick={() => sortTasks("Doing right now")}>Show "Doing" First</Button>
+          <Button onClick={() => sortTasks("Not done")}>Show "Not Done" First</Button>
+
+          <Button onClick={() => filterTasks("Done")}>Show Only "Done"</Button>
+          <Button onClick={() => filterTasks("Not done")}>Show Only "Not Done"</Button>
+          <Button onClick={() => filterTasks("Doing right now")}>
+            Show Only "Doing"
+          </Button>
+
             <Group position={"apart"}>
               <Title
                 sx={(theme) => ({
@@ -158,12 +270,32 @@ export default function App() {
                         >
                           <Trash />
                         </ActionIcon>
+                        <ActionIcon
+                          onClick={() => {
+                            setStateChange(true);
+                            setEditIndex(index);
+                          }}
+                          color={"blue"}
+                          variant={"transparent"}
+                        >
+                          Edit
+                        </ActionIcon>
                       </Group>
                       <Text color={"dimmed"} size={"md"} mt={"sm"}>
                         {task.summary
                           ? task.summary
                           : "No summary was provided for this task"}
                       </Text>
+                      <TextInput
+                        ref={taskState}
+                        mt={"md"}
+                        placeholder={task.state}
+                        label={"State"}
+                        onKeyDown={(e) => {
+                          if (e.key === "Enter")
+                              updateState(index);
+                          }}
+                      ></TextInput>
                     </Card>
                   );
                 }
